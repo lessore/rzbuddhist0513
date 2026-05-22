@@ -1,0 +1,28 @@
+{if $total_pages > 1}
+<div class="pagination">
+  {if $page > 1}
+    <a href="{$page_url}{$page-1}" class="pg-btn">&laquo;</a>
+  {else}
+    <span class="pg-btn pg-disabled">&laquo;</span>
+  {/if}
+
+  {php $start = max(1, min($page - 2, $total_pages - 4));}
+  {php $end   = min($total_pages, $start + 4);}
+
+  {php for($i = $start; $i <= $end; $i++):}
+    {if $i == $page}
+      <span class="pg-btn pg-active">{php echo $i;}</span>
+    {else}
+      <a href="{$page_url}{php echo $i;}" class="pg-btn">{php echo $i;}</a>
+    {/if}
+  {php endfor;}
+
+  {if $page < $total_pages}
+    <a href="{$page_url}{$page+1}" class="pg-btn">&raquo;</a>
+  {else}
+    <span class="pg-btn pg-disabled">&raquo;</span>
+  {/if}
+
+  <span class="pg-total">共{$total_pages}页</span>
+</div>
+{/if}

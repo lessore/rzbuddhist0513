@@ -1,0 +1,641 @@
+{template "header.html"}
+
+<div class="page-wrap">
+
+  {if $is_login && !$has_access}
+  <script>
+    window.addEventListener('DOMContentLoaded', function(){
+      showToast('您没有访问权限');
+      setTimeout(function(){
+        $.post('index.php?s=member&c=login&m=out', {}, function(){
+          location.reload();
+        });
+      }, 1500);
+    });
+  </script>
+  {elseif $is_login}
+
+  <!-- 累计总数 -->
+  <div class="total-box">
+    <div class="total-main">
+      <div class="total-mixed">{$total_mixed}位</div>
+    </div>
+    <div class="total-milestone">
+        <div>放生亿万命共修无量心(第30亿进行中)2025.11.12~今</div>
+      </div>
+      <div class="total-month">
+        <span class="total-month-label">{$month_name}{$month_total}位</span>
+      </div>
+   
+  </div>
+
+  <!-- 提交表单 -->
+  <div class="card">
+    <div class="section-title">我要报数</div>
+    <form id="baoshu-form">
+      <div class="form-group">
+        <label>物命数量 <span style="color:#e74c3c">*</span></label>
+        <input type="number" class="form-control" id="number" name="number"
+          placeholder="请输入整数数量" min="1" max="100000000" autocomplete="off">
+        <div class="cn-preview" id="cn-preview"></div>
+      </div>
+      <div class="form-group">
+        <label>内容描述 <span style="color:#e74c3c">*</span></label>
+        <textarea class="form-control" id="note" name="note" placeholder="例如：XX组，放生泥鳅XXX位，鲤鱼XXX位" maxlength="10000"></textarea>
+        <div id="note-count" style="font-size:12px;color:#aaa;text-align:right;margin-top:3px"></div>
+      </div>
+      <button type="submit" class="btn-submit" id="submit-btn">提交报数</button>
+    </form>
+  </div>
+
+  <!-- 报数记录 -->
+  <div class="card">
+    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>报数记录</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        {if $is_admin}<button type="button" id="archive-toggle-btn" class="btn-logout btn-archive" onclick="toggleArchiveMode()">开始归档</button>{/if}
+        <a href="index.php?s=baoshu&c=home&m=history" class="btn-history">历史记录</a>
+      </div>
+    </div>
+    {if $list}
+      {loop $list $row}
+      <div class="record-item"
+           data-id="{$row.id}"
+           data-uid="{$row.uid}"
+           data-note="{$row.note}"
+           data-number="{$row.number}">
+        <div class="record-header">
+          <span class="record-user">{$row.username}</span>
+          <span class="record-time">{date('Y-m-d', $row.inputtime)}</span>
+        </div>
+        <div class="record-num">数量：{$row.number_mixed}位</div>
+        <div class="record-note">{$row.note}</div>
+        <button class="btn-expand" onclick="toggleExpand(this)">展开</button>
+        <div class="record-footer">
+          <span></span>
+          <span class="record-actions"></span>
+        </div>
+      </div>
+      {/loop}
+      {template "baoshu/pagination.html"}
+    {else}
+      <div class="empty-tip">暂无报数记录</div>
+    {/if}
+  </div>
+
+  <div style="display:flex;gap:8px;justify-content:center;padding:10px 0 4px">
+    <button type="button" class="btn-logout btn-changepwd" onclick="$('#pwdModal').modal('show')">修改密码</button>
+    <button type="button" class="btn-logout" onclick="doLogout()">退出登录</button>
+  </div>
+
+  {else}
+
+  <!-- 未登录提示 -->
+  <div class="card">
+    <div style="text-align:center;padding:12px 0 20px;color:#666;font-size:15px">
+      参与报数
+    </div>
+    <ul class="nav nav-tabs login-tabs">
+      <li class="active"><a href="#tab-pwd" data-toggle="tab">账号登录</a></li>
+      <li><a href="#tab-sms" data-toggle="tab">短信登录</a></li>
+      <li><a href="#tab-reg" data-toggle="tab">注册</a></li>
+    </ul>
+    <div class="tab-content" style="padding-top:16px">
+
+      <!-- 账号密码 -->
+      <div class="tab-pane fade in active" id="tab-pwd">
+        <form id="login-form">
+          <input type="hidden" name="back" value="index.php?s=baoshu&c=home&m=index">
+          <div class="form-group">
+            <input type="text" class="form-control" name="data[username]" placeholder="用户名/邮箱" autocomplete="username">
+          </div>
+          <div class="form-group">
+            <input type="password" class="form-control" name="data[password]" placeholder="密码" autocomplete="current-password">
+          </div>
+          <div style="text-align:right;margin-bottom:10px">
+            <a href="index.php?s=member&c=login&m=find" style="font-size:13px;color:#888;text-decoration:none">忘记密码</a>
+          </div>
+          <button type="button" class="btn-submit"
+            onclick="dr_ajax_member('index.php?s=member&c=login&m=index','login-form')">登录</button>
+        </form>
+      </div>
+
+      <!-- 短信登录 -->
+      <div class="tab-pane fade" id="tab-sms">
+        <form id="sms-form">
+          <input type="hidden" name="back" value="index.php?s=baoshu&c=home&m=index">
+          <div class="form-group">
+            <input type="tel" class="form-control" id="sms-phone" name="data[phone]"
+              value="+86" autocomplete="tel">
+          </div>
+          <div class="form-group" style="display:flex;gap:8px">
+            <input type="text" class="form-control" name="sms"
+              placeholder="短信验证码" autocomplete="one-time-code" maxlength="6" style="flex:1">
+            <button type="button" class="btn-getcode" id="sms-send-btn"
+              onclick="sendSmsCode()">获取验证码</button>
+          </div>
+          <button type="button" class="btn-submit"
+            onclick="dr_ajax_member('index.php?s=member&c=login&m=sms','sms-form')">登录</button>
+        </form>
+      </div>
+
+      <!-- 注册账号 -->
+      <div class="tab-pane fade" id="tab-reg">
+        <ul class="nav nav-tabs login-tabs" style="margin-top:4px">
+          <li class="active"><a href="#reg-phone" data-toggle="tab">手机注册</a></li>
+          <li><a href="#reg-email" data-toggle="tab">邮箱注册</a></li>
+        </ul>
+        <div class="tab-content" style="padding-top:14px">
+
+          <div class="tab-pane fade" id="reg-email">
+            <form id="email-reg-form">
+              <input type="hidden" name="back" value="index.php?s=baoshu&c=home&m=index">
+              <div class="form-group">
+                <input type="text" class="form-control" name="data[username]" placeholder="用户名" autocomplete="username">
+              </div>
+              <div class="form-group">
+                <input type="email" class="form-control" name="data[email]" placeholder="邮箱" autocomplete="email">
+              </div>
+              <div class="form-group">
+                <input type="password" class="form-control" name="data[password]" placeholder="密码" autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <input type="password" class="form-control" name="data[password2]" placeholder="确认密码" autocomplete="new-password">
+              </div>
+              <div class="form-group protocol-row">
+                <label><input type="checkbox" name="is_protocol" value="1" checked> 我已阅读并同意<a href="javascript:dr_show_protocol();">《用户注册协议》</a></label>
+              </div>
+              <button type="button" class="btn-submit"
+                onclick="dr_ajax_member('index.php?s=member&c=register&m=emailindex','email-reg-form')">注册</button>
+            </form>
+          </div>
+
+          
+          <div class="tab-pane fade in active" id="reg-phone">
+            <form id="phone-reg-form">
+              <input type="hidden" name="back" value="index.php?s=baoshu&c=home&m=index">
+              <div class="form-group">
+                <input type="text" class="form-control" name="data[username]" placeholder="用户名" autocomplete="username">
+              </div>
+              <div class="form-group">
+                <input type="tel" class="form-control" id="reg-phone-input" name="data[phone]"
+                  value="+86" autocomplete="tel">
+              </div>
+              <div class="form-group">
+                <input type="password" class="form-control" name="data[password]" placeholder="密码" autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <input type="password" class="form-control" name="data[password2]" placeholder="确认密码" autocomplete="new-password">
+              </div>
+              <div class="form-group" style="display:flex;gap:8px">
+                <input type="text" class="form-control" name="sms"
+                  placeholder="手机验证码" autocomplete="off" style="flex:1">
+                <button type="button" class="btn-getcode" id="reg-send-btn"
+                  onclick="sendRegSmsCode()">获取验证码</button>
+              </div>
+              <div class="form-group protocol-row">
+                <label><input type="checkbox" name="is_protocol" value="1" checked> 我已阅读并同意<a href="javascript:dr_show_protocol();">《用户注册协议》</a></label>
+              </div>
+              <button type="button" class="btn-submit"
+                onclick="dr_ajax_member('index.php?s=member&c=register&m=phoneindex','phone-reg-form')">注册</button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  {/if}
+
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">修改报数</h4>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label>数量</label>
+          <input type="number" class="form-control" id="edit-number" min="1" max="100000000">
+          <div class="cn-preview" id="edit-cn-preview"></div>
+        </div>
+        <div class="form-group">
+          <label>内容描述</label>
+          <textarea class="form-control" id="edit-note" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+        <button type="button" class="btn-submit" id="edit-save-btn"
+                style="width:auto;padding:10px 24px;display:inline-block">保存修改</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div class="modal fade" id="pwdModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">修改密码</h4>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>当前密码</label>
+          <input type="password" class="form-control" id="pwd-old" placeholder="请输入当前密码" autocomplete="current-password">
+        </div>
+        <div class="form-group">
+          <label>新密码</label>
+          <input type="password" class="form-control" id="pwd-new" placeholder="至少6位" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label>确认新密码</label>
+          <input type="password" class="form-control" id="pwd-confirm" placeholder="再次输入新密码" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+        <button type="button" class="btn-submit" id="pwd-save-btn"
+                style="width:auto;padding:10px 24px;display:inline-block">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-msg" id="toast"></div>
+
+<style>
+.record-num{margin-bottom:6px;letter-spacing:1px}
+.record-note{display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.record-note.expanded{display:block;overflow:visible}
+.btn-expand{display:none;background:none;border:none;color:#a20325;font-size:12px;padding:2px 0;cursor:pointer}
+.record-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.pagination{display:flex;align-items:center;gap:4px;padding:14px 0 2px;flex-wrap:wrap}
+.pg-btn{min-width:32px;height:32px;line-height:32px;text-align:center;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#490f10;text-decoration:none;display:inline-block;padding:0 6px}
+.pg-btn:hover{border-color:#490f10;background:#fcf2ee}
+.pg-active{background:#490f10;color:#fff;border-color:#490f10}
+.pg-active:hover{background:#490f10;color:#fff}
+.pg-disabled{color:#ccc;border-color:#eee;cursor:default}
+.pg-total{font-size:12px;color:#aaa;margin-left:4px}
+.login-tabs{border-bottom:2px solid #f0f0f0;margin-bottom:0}
+.login-tabs>li>a{color:#888;border:none;padding:8px 16px;font-size:14px}
+.login-tabs>li.active>a{color:#490f10;border-bottom:2px solid #490f10;font-weight:bold}
+.btn-getcode{background:#fff;color:#490f10;border:1px solid #490f10;border-radius:8px;padding:10px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn-getcode:disabled{color:#bbb;border-color:#ddd;cursor:not-allowed}
+.btn-edit,.btn-del{border:none;background:none;font-size:13px;cursor:pointer;padding:3px 8px;border-radius:4px}
+.btn-edit{color:#a20325;background:#fcf2ee}
+.btn-del{color:#e74c3c;background:#fcf2ee;margin-left:6px}
+.btn-archive-item{color:#b8860b;background:#fdf8ee;margin-left:6px}
+.btn-edit:hover{background:#e8e0fa}
+.btn-del:hover{background:#fddcd9}
+.btn-logout{background:none;border:1px solid #ccc;color:#999;font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer}
+.btn-logout:hover{border-color:#e74c3c;color:#e74c3c}
+.btn-changepwd{border-color:#490f10;color:#490f10}
+.btn-changepwd:hover{border-color:#490f10;color:#fff;background:#490f10}
+.btn-archive{border-color:#b8860b;color:#b8860b}
+.btn-archive:hover{border-color:#b8860b;color:#fff;background:#b8860b}
+.archive-mode-on{border-color:#e74c3c!important;color:#e74c3c!important}
+.archive-mode-on:hover{background:#e74c3c!important;color:#fff!important}
+.btn-history{font-size:12px;color:#888;border:1px solid #ccc;border-radius:6px;padding:3px 10px;text-decoration:none}
+.btn-history:hover{color:#490f10;border-color:#490f10}
+.total-box{background:#3d0a0b;color:#f5e6c8;padding:30px 2px 24px;border-radius:0;text-align:center}
+.total-main{padding:0 0 14px}
+.total-mixed{font-size:27px;font-weight:bold;letter-spacing:1px;line-height:1.1}
+.total-milestone{font-size:10.5px;color:#c9a96e;font-weight:bold;line-height:1.8;padding-bottom:10px}
+.total-month{font-size:10.5px;font-weight:bold;}
+.total-month-label{color:#c9a96e}
+.total-month-num{color:#f5e6c8;margin-left:4px}
+</style>
+
+<script>
+var MY_UID   = {$my_uid};
+var MY_ADMIN = {$is_admin};
+
+// ── 数字转混合格式（1亿5437万5645）──────────────────────────────────
+function toMixedNum(n) {
+    n = parseInt(n, 10);
+    if (!n || isNaN(n) || n <= 0) return '';
+    function pad4(v) { v = String(v); while (v.length < 4) v = '0' + v; return v; }
+    var yi  = Math.floor(n / 100000000);
+    var wan = Math.floor((n % 100000000) / 10000);
+    var ge  = n % 10000;
+    if (yi > 0) {
+        var r = yi + '亿';
+        if (wan > 0 || ge > 0) r += pad4(wan) + '万';
+        if (ge > 0) r += pad4(ge);
+        return r;
+    }
+    if (wan > 0) {
+        var r = wan + '万';
+        if (ge > 0) r += pad4(ge);
+        return r;
+    }
+    return String(ge);
+}
+
+// ── Toast 提示 ──────────────────────────────────────────────────────
+function showToast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(function(){ el.style.display = 'none'; }, 2000);
+}
+
+// ── 归档模式开关 ────────────────────────────────────────────────────
+function toggleArchiveMode() {
+    var btns = document.querySelectorAll('.btn-archive-item');
+    var toggleBtn = document.getElementById('archive-toggle-btn');
+    var isActive = toggleBtn.classList.contains('archive-mode-on');
+    if (isActive) {
+        btns.forEach(function(b){ b.style.display = 'none'; });
+        toggleBtn.classList.remove('archive-mode-on');
+        toggleBtn.textContent = '开始归档';
+    } else {
+        btns.forEach(function(b){ b.style.display = ''; });
+        toggleBtn.classList.add('archive-mode-on');
+        toggleBtn.textContent = '归档结束';
+    }
+}
+
+// ── 归档至指定记录 ──────────────────────────────────────────────────
+function doArchiveAt(btn) {
+    var id = btn.closest('.record-item').dataset.id;
+    if (!confirm('确定将此条及之前的所有记录归档？\n之后的记录保留，总数不变。')) return;
+    $.ajax({
+        url     : 'index.php?s=baoshu&c=home&m=archive',
+        method  : 'POST',
+        data    : { record_id: id },
+        dataType: 'json',
+        success : function(res) {
+            if (res.code == 1) {
+                showToast(res.msg);
+                setTimeout(function(){ location.reload(); }, 1500);
+            } else {
+                showToast(res.msg || '操作失败');
+            }
+        },
+        error: function(){ showToast('网络错误'); }
+    });
+}
+
+// ── 退出登录 ────────────────────────────────────────────────────────
+function doLogout() {
+    $.ajax({
+        url     : 'index.php?s=member&c=login&m=out',
+        method  : 'POST',
+        dataType: 'json',
+        success : function(res) {
+            if (res.code == 1) {
+                location.reload();
+            } else {
+                showToast(res.msg || '退出失败');
+            }
+        },
+        error: function(){ showToast('网络错误'); }
+    });
+}
+
+// ── 为自己的记录加编辑/删除按钮 ────────────────────────────────────
+document.querySelectorAll('.record-item').forEach(function(item) {
+    if (MY_UID > 0 && (MY_ADMIN || parseInt(item.dataset.uid) === MY_UID)) {
+        var actions = item.querySelector('.record-actions');
+        var archiveBtn = MY_ADMIN
+            ? '<button class="btn-archive-item" onclick="doArchiveAt(this)" title="将此条及之前所有记录归档" style="display:none">归档至此</button>'
+            : '';
+        var delBtn = MY_ADMIN ? '<button class="btn-del" onclick="doDelete(this)">删除</button>' : '';
+        actions.innerHTML =
+            '<button class="btn-edit" onclick="openEdit(this)">编辑</button>' +
+            delBtn + archiveBtn;
+    }
+});
+
+// ── 展开/折叠记录内容 ───────────────────────────────────────────────
+function toggleExpand(btn) {
+    var note = btn.previousElementSibling;
+    var expanded = note.classList.toggle('expanded');
+    btn.textContent = expanded ? '收起' : '展开';
+}
+document.querySelectorAll('.record-note').forEach(function(note) {
+    if (note.scrollHeight > note.clientHeight) {
+        note.nextElementSibling.style.display = 'inline';
+    }
+});
+
+// ── 字数统计 ────────────────────────────────────────────────────────
+var noteEl = document.getElementById('note');
+var noteCount = document.getElementById('note-count');
+if (noteEl && noteCount) {
+    noteEl.addEventListener('input', function(){
+        var len = this.value.length;
+        noteCount.textContent = len > 0 ? len + ' / 10000' : '';
+    });
+}
+
+// ── 实时预览（提交表单）────────────────────────────────────────────
+var numInput = document.getElementById('number');
+if (numInput) {
+    numInput.addEventListener('input', function(){
+        var v = parseInt(this.value, 10);
+        var el = document.getElementById('cn-preview');
+        if (!v || v <= 0)          { el.textContent = ''; return; }
+        if (v > 100000000)         { el.style.color='#e74c3c'; el.textContent = '单次报数上限一亿'; return; }
+        el.style.color = '';
+        el.textContent = '数量：' + toMixedNum(v);
+    });
+}
+
+// ── 实时预览（编辑弹窗）────────────────────────────────────────────
+var editNumInput = document.getElementById('edit-number');
+if (editNumInput) {
+    editNumInput.addEventListener('input', function(){
+        var v = parseInt(this.value, 10);
+        var el = document.getElementById('edit-cn-preview');
+        if (!v || v <= 0)          { el.textContent = ''; return; }
+        if (v > 100000000)         { el.style.color='#e74c3c'; el.textContent = '单次报数上限一亿'; return; }
+        el.style.color = '';
+        el.textContent = '数量：' + toMixedNum(v);
+    });
+}
+
+// ── 打开编辑弹窗 ────────────────────────────────────────────────────
+function openEdit(btn) {
+    var item = btn.closest('.record-item');
+    document.getElementById('edit-id').value     = item.dataset.id;
+    document.getElementById('edit-note').value   = item.dataset.note;
+    document.getElementById('edit-number').value = item.dataset.number;
+    document.getElementById('edit-cn-preview').textContent = '数量：' + toMixedNum(item.dataset.number);
+    $('#editModal').modal('show');
+}
+
+// ── 保存编辑 ────────────────────────────────────────────────────────
+var editSaveBtn = document.getElementById('edit-save-btn');
+if (editSaveBtn) {
+    editSaveBtn.addEventListener('click', function(){
+        var id     = document.getElementById('edit-id').value;
+        var note   = document.getElementById('edit-note').value.trim();
+        var number = document.getElementById('edit-number').value.trim();
+        if (!note)                            { showToast('请填写内容描述'); return; }
+        if (!number || parseInt(number) <= 0) { showToast('请填写正确的数量'); return; }
+        var btn = this;
+        btn.disabled = true;
+        $.ajax({
+            url     : 'index.php?s=baoshu&c=home&m=edit',
+            method  : 'POST',
+            data    : { id: id, note: note, number: number },
+            dataType: 'json',
+            success : function(res) {
+                if (res.code == 1) {
+                    $('#editModal').modal('hide');
+                    showToast('修改成功');
+                    setTimeout(function(){ location.reload(); }, 1200);
+                } else {
+                    showToast(res.msg || '修改失败');
+                    btn.disabled = false;
+                }
+            },
+            error: function(){ showToast('网络错误'); btn.disabled = false; }
+        });
+    });
+}
+
+// ── 删除 ────────────────────────────────────────────────────────────
+function doDelete(btn) {
+    if (!confirm('确定删除这条记录？')) return;
+    var item = btn.closest('.record-item');
+    var id   = item.dataset.id;
+    $.ajax({
+        url     : 'index.php?s=baoshu&c=home&m=delete',
+        method  : 'POST',
+        data    : { id: id },
+        dataType: 'json',
+        success : function(res) {
+            if (res.code == 1) {
+                showToast('删除成功');
+                setTimeout(function(){ location.reload(); }, 1200);
+            } else {
+                showToast(res.msg || '删除失败');
+            }
+        },
+        error: function(){ showToast('网络错误'); }
+    });
+}
+
+// ── 发送短信验证码（含60秒倒计时）──────────────────────────────────
+function sendSmsCode() {
+    var phone = document.getElementById('sms-phone').value.trim().replace(/\s+/g, '');
+    if (!phone || phone === '+86') { showToast('请输入手机号'); return; }
+    var btn = document.getElementById('sms-send-btn');
+    btn.disabled = true;
+    dr_ajax_url('index.php?s=member&c=api&m=login_code&id=' + encodeURIComponent(phone));
+    var sec = 60;
+    var timer = setInterval(function() {
+        sec--;
+        btn.textContent = sec + 's 后重发';
+        if (sec <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = '获取验证码';
+        }
+    }, 1000);
+}
+
+// ── 注册发送短信验证码 ──────────────────────────────────────────────
+function sendRegSmsCode() {
+    var phone = document.getElementById('reg-phone-input').value.trim().replace(/\s+/g, '');
+    if (!phone || phone === '+86') { showToast('请输入手机号'); return; }
+    var btn = document.getElementById('reg-send-btn');
+    btn.disabled = true;
+    dr_ajax_url('index.php?s=member&c=api&m=register_code&id=' + encodeURIComponent(phone));
+    var sec = 60;
+    var timer = setInterval(function() {
+        sec--;
+        btn.textContent = sec + 's 后重发';
+        if (sec <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = '获取验证码';
+        }
+    }, 1000);
+}
+
+// ── 修改密码 ────────────────────────────────────────────────────────
+var pwdSaveBtn = document.getElementById('pwd-save-btn');
+if (pwdSaveBtn) {
+    pwdSaveBtn.addEventListener('click', function(){
+        var old_pwd     = document.getElementById('pwd-old').value.trim();
+        var new_pwd     = document.getElementById('pwd-new').value.trim();
+        var confirm_pwd = document.getElementById('pwd-confirm').value.trim();
+        if (!old_pwd)                   { showToast('请输入当前密码'); return; }
+        if (!new_pwd)                   { showToast('请输入新密码'); return; }
+        if (new_pwd.length < 6)         { showToast('新密码至少6位'); return; }
+        if (new_pwd !== confirm_pwd)    { showToast('两次密码不一致'); return; }
+        var btn = this;
+        btn.disabled = true;
+        $.ajax({
+            url     : 'index.php?s=baoshu&c=home&m=changepassword',
+            method  : 'POST',
+            data    : { old_pwd: old_pwd, new_pwd: new_pwd },
+            dataType: 'json',
+            success : function(res) {
+                if (res.code == 1) {
+                    $('#pwdModal').modal('hide');
+                    showToast('密码修改成功，请重新登录');
+                    setTimeout(function(){ location.reload(); }, 1800);
+                } else {
+                    showToast(res.msg || '修改失败');
+                    btn.disabled = false;
+                }
+            },
+            error: function(){ showToast('网络错误'); btn.disabled = false; }
+        });
+    });
+    $('#pwdModal').on('hidden.bs.modal', function(){
+        document.getElementById('pwd-old').value = '';
+        document.getElementById('pwd-new').value = '';
+        document.getElementById('pwd-confirm').value = '';
+        document.getElementById('pwd-save-btn').disabled = false;
+    });
+}
+
+// ── 提交新报数 ──────────────────────────────────────────────────────
+{if $is_login}
+document.getElementById('baoshu-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    var note   = document.getElementById('note').value.trim();
+    var number = document.getElementById('number').value.trim();
+    if (!note)                            { showToast('请填写内容描述'); return; }
+    if (!number || parseInt(number) <= 0) { showToast('请填写正确的数量'); return; }
+
+    var btn = document.getElementById('submit-btn');
+    btn.disabled = true; btn.textContent = '提交中…';
+
+    $.ajax({
+        url     : 'index.php?s=baoshu&c=home&m=index',
+        method  : 'POST',
+        data    : { note: note, number: number },
+        dataType: 'json',
+        success : function(res) {
+            if (res.code == 1) {
+                showToast('报数成功！');
+                setTimeout(function(){ location.reload(); }, 1500);
+            } else {
+                showToast(res.msg || '提交失败');
+                btn.disabled = false; btn.textContent = '提交报数';
+            }
+        },
+        error: function(){ showToast('网络错误'); btn.disabled = false; btn.textContent = '提交报数'; }
+    });
+});
+{/if}
+</script>
+
+{template "footer.html"}

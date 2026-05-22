@@ -1,0 +1,218 @@
+{template "header.html"}
+
+<div class="page-wrap">
+
+  <!-- 历史记录 -->
+  <div class="card">
+    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>历史记录（已归档）</span>
+      <a href="index.php?s=baoshu&c=home&m=index" class="btn-history">返回报数</a>
+    </div>
+    {if $list}
+      {loop $list $row}
+      <div class="record-item"
+           data-id="{$row.id}"
+           data-uid="{$row.uid}"
+           data-note="{$row.note}"
+           data-number="{$row.number}">
+        <div class="record-header">
+          <span class="record-user">{$row.username}</span>
+          <span class="record-time">{date('Y-m-d', $row.inputtime)}</span>
+        </div>
+        <div class="record-num">数量：{$row.number_mixed}位/div>
+        <div class="record-note">{$row.note}</div>
+        <button class="btn-expand" onclick="toggleExpand(this)">展开</button>
+        <div class="record-footer">
+          <span></span>
+          <span class="record-actions"></span>
+        </div>
+      </div>
+      {/loop}
+      {template "baoshu/pagination.html"}
+    {else}
+      <div class="empty-tip">暂无历史记录</div>
+    {/if}
+  </div>
+
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">修改报数</h4>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label>内容描述</label>
+          <textarea class="form-control" id="edit-note" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>数量</label>
+          <input type="number" class="form-control" id="edit-number" min="1" max="100000000">
+          <div class="cn-preview" id="edit-cn-preview"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+        <button type="button" class="btn-submit" id="edit-save-btn"
+                style="width:auto;padding:10px 24px;display:inline-block">保存修改</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-msg" id="toast"></div>
+
+<style>
+.record-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.pagination{display:flex;align-items:center;gap:4px;padding:14px 0 2px;flex-wrap:wrap}
+.pg-btn{min-width:32px;height:32px;line-height:32px;text-align:center;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#490f10;text-decoration:none;display:inline-block;padding:0 6px}
+.pg-btn:hover{border-color:#490f10;background:#fcf2ee}
+.pg-active{background:#490f10;color:#fff;border-color:#490f10}
+.pg-active:hover{background:#490f10;color:#fff}
+.pg-disabled{color:#ccc;border-color:#eee;cursor:default}
+.pg-total{font-size:12px;color:#aaa;margin-left:4px}
+.record-num{margin-bottom:6px}
+.record-note{display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.record-note.expanded{display:block;overflow:visible}
+.btn-expand{display:none;background:none;border:none;color:#a20325;font-size:12px;padding:2px 0;cursor:pointer}
+.btn-edit,.btn-del{border:none;background:none;font-size:13px;cursor:pointer;padding:3px 8px;border-radius:4px}
+.btn-edit{color:#a20325;background:#fcf2ee}
+.btn-del{color:#e74c3c;background:#fcf2ee;margin-left:6px}
+.btn-edit:hover{background:#e8e0fa}
+.btn-del:hover{background:#fddcd9}
+.btn-history{font-size:12px;color:#888;border:1px solid #ccc;border-radius:6px;padding:3px 10px;text-decoration:none}
+.btn-history:hover{color:#490f10;border-color:#490f10}
+</style>
+
+<script>
+var MY_UID   = {$my_uid};
+var MY_ADMIN = {$is_admin};
+
+function toMixedNum(n) {
+    n = parseInt(n, 10);
+    if (!n || isNaN(n) || n <= 0) return '';
+    function pad4(v) { v = String(v); while (v.length < 4) v = '0' + v; return v; }
+    var yi  = Math.floor(n / 100000000);
+    var wan = Math.floor((n % 100000000) / 10000);
+    var ge  = n % 10000;
+    if (yi > 0) {
+        var r = yi + '亿';
+        if (wan > 0 || ge > 0) r += pad4(wan) + '万';
+        if (ge > 0) r += pad4(ge);
+        return r;
+    }
+    if (wan > 0) {
+        var r = wan + '万';
+        if (ge > 0) r += pad4(ge);
+        return r;
+    }
+    return String(ge);
+}
+
+function showToast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(function(){ el.style.display = 'none'; }, 2000);
+}
+
+// ── 展开/折叠记录内容 ───────────────────────────────────────────────
+function toggleExpand(btn) {
+    var note = btn.previousElementSibling;
+    var expanded = note.classList.toggle('expanded');
+    btn.textContent = expanded ? '收起' : '展开';
+}
+document.querySelectorAll('.record-note').forEach(function(note) {
+    if (note.scrollHeight > note.clientHeight) {
+        note.nextElementSibling.style.display = 'inline';
+    }
+});
+
+document.querySelectorAll('.record-item').forEach(function(item) {
+    if (MY_ADMIN) {
+        var actions = item.querySelector('.record-actions');
+        actions.innerHTML =
+            '<button class="btn-edit" onclick="openEdit(this)">编辑</button>' +
+            '<button class="btn-del"  onclick="doDelete(this)">删除</button>';
+    }
+});
+
+var editNumInput = document.getElementById('edit-number');
+if (editNumInput) {
+    editNumInput.addEventListener('input', function(){
+        var v = parseInt(this.value, 10);
+        var el = document.getElementById('edit-cn-preview');
+        if (!v || v <= 0)    { el.textContent = ''; return; }
+        if (v > 100000000)   { el.style.color='#e74c3c'; el.textContent = '单次报数上限一亿'; return; }
+        el.style.color = '';
+        el.textContent = toMixedNum(v);
+    });
+}
+
+function openEdit(btn) {
+    var item = btn.closest('.record-item');
+    document.getElementById('edit-id').value     = item.dataset.id;
+    document.getElementById('edit-note').value   = item.dataset.note;
+    document.getElementById('edit-number').value = item.dataset.number;
+    document.getElementById('edit-cn-preview').textContent = toMixedNum(item.dataset.number);
+    $('#editModal').modal('show');
+}
+
+var editSaveBtn = document.getElementById('edit-save-btn');
+if (editSaveBtn) {
+    editSaveBtn.addEventListener('click', function(){
+        var id     = document.getElementById('edit-id').value;
+        var note   = document.getElementById('edit-note').value.trim();
+        var number = document.getElementById('edit-number').value.trim();
+        if (!note)                            { showToast('请填写内容描述'); return; }
+        if (!number || parseInt(number) <= 0) { showToast('请填写正确的数量'); return; }
+        var btn = this;
+        btn.disabled = true;
+        $.ajax({
+            url     : 'index.php?s=baoshu&c=home&m=edit',
+            method  : 'POST',
+            data    : { id: id, note: note, number: number },
+            dataType: 'json',
+            success : function(res) {
+                if (res.code == 1) {
+                    $('#editModal').modal('hide');
+                    showToast('修改成功');
+                    setTimeout(function(){ location.reload(); }, 1200);
+                } else {
+                    showToast(res.msg || '修改失败');
+                    btn.disabled = false;
+                }
+            },
+            error: function(){ showToast('网络错误'); btn.disabled = false; }
+        });
+    });
+}
+
+function doDelete(btn) {
+    if (!confirm('确定删除这条记录？')) return;
+    var item = btn.closest('.record-item');
+    var id   = item.dataset.id;
+    $.ajax({
+        url     : 'index.php?s=baoshu&c=home&m=delete',
+        method  : 'POST',
+        data    : { id: id },
+        dataType: 'json',
+        success : function(res) {
+            if (res.code == 1) {
+                showToast('删除成功');
+                setTimeout(function(){ location.reload(); }, 1200);
+            } else {
+                showToast(res.msg || '删除失败');
+            }
+        },
+        error: function(){ showToast('网络错误'); }
+    });
+}
+</script>
+
+{template "footer.html"}

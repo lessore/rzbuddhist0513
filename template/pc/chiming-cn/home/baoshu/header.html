@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>{$meta_title}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script>var is_mobile_cms='{IS_MOBILE}';var web_dir='{WEB_DIR}';</script>
+<script src="{LANG_PATH}lang.js"></script>
+<script src="{THEME_PATH}assets/global/plugins/jquery.min.js"></script>
+<script src="{THEME_PATH}assets/js/cms.js"></script>
+<link href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="{HOME_THEME_PATH}css/header.css">
+<link rel="stylesheet" href="{HOME_THEME_PATH}css/footer.css">
+<link rel="stylesheet" href="{HOME_THEME_PATH}css/layout.css">
+<style>
+*{box-sizing:border-box}
+body{background:#f5f0e8;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:#333;margin:0;padding:0}
+.page-wrap{max-width:680px;margin:0 auto;padding:15px}
+.card{background:#fff;border-radius:0;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+
+/* 总计区 */
+.total-box{background:linear-gradient(135deg, #490f10 0%,#270e0f 100%);color:#fff;text-align:center;padding:30px 20px;border-radius:12px;margin-bottom:16px}
+.total-label{font-size:15px;opacity:.85;margin-bottom:10px;letter-spacing:1px}
+.total-arabic{font-size:46px;font-weight:bold;letter-spacing:3px;text-shadow:0 2px 4px rgba(0,0,0,.2)}
+.total-cn{font-size:17px;opacity:.92;margin-top:8px;letter-spacing:2px}
+
+/* 表单区 */
+.section-title{font-size:16px;font-weight:bold;color: #490f10;margin-bottom:16px;border-left:4px solid  #490f10;padding-left:10px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:14px;color:#666;margin-bottom:6px}
+textarea.form-control,input.form-control{border:1px solid #ddd;border-radius:8px;padding:10px 12px;font-size:15px;width:100%;transition:border .2s}
+textarea.form-control{resize:vertical;min-height:80px}
+textarea.form-control:focus,input.form-control:focus{border-color: #490f10;outline:none;box-shadow:0 0 0 3px rgba(90,62,133,.1)}
+.cn-preview{font-size:20px;color: #490f10;font-weight:bold;min-height:28px;margin-top:6px;letter-spacing:2px;transition:opacity .2s}
+.btn-submit{background: #490f10;color:#fff;border:none;border-radius:0;padding:13px 30px;font-size:16px;width:100%;cursor:pointer;letter-spacing:2px;transition:background .2s}
+.btn-submit:hover{background:#4a3070}
+.btn-submit:disabled{background:#bbb;cursor:not-allowed}
+.login-tip{text-align:center;padding:20px 0;color:#888;font-size:15px}
+.login-tip a{color: #490f10;font-weight:bold;text-decoration:none}
+
+/* 记录列表 */
+.record-item{border-bottom:1px solid #f0f0f0;padding:14px 0}
+.record-item:last-child{border-bottom:none;padding-bottom:0}
+.record-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.record-user{font-size:14px;font-weight:bold;color: #490f10}
+.record-time{font-size:12px;color:#bbb}
+.record-note{font-size:15px;color:#444;margin-bottom:8px;line-height:1.6}
+.record-num{display:inline-flex;align-items:baseline;background:#fcf2ee;color: #490f10;border-radius:6px;padding:4px 12px;gap:6px}
+.record-num-arabic{font-size:22px;font-weight:bold}
+.record-num-cn{font-size:13px;opacity:.8}
+.empty-tip{text-align:center;color:#bbb;padding:20px 0;font-size:14px}
+
+/* 浮层提示 */
+.toast-msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.72);color:#fff;padding:12px 28px;border-radius:10px;font-size:15px;z-index:9999;display:none;letter-spacing:1px}
+
+@media(max-width:480px){
+  .page-wrap{padding:10px}
+  .total-arabic{font-size:36px}
+  .total-cn{font-size:15px}
+}
+</style>
+</head>
+<body>
