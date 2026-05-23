@@ -80,6 +80,31 @@ class Home extends \Phpcmf\App
         }
     }
 
+    private function _format_datetime(int $timestamp): string
+    {
+        return $timestamp > 0 ? date('Y-m-d H:i:s', $timestamp) : '';
+    }
+
+    private function _csv_cell($value): string
+    {
+        $value = (string) $value;
+        if ($value !== '' && preg_match('/^[=+\-@]/', $value)) {
+            $value = "'" . $value;
+        }
+
+        return $value;
+    }
+
+    private function _csv_row($fp, array $row): void
+    {
+        $safeRow = [];
+        foreach ($row as $value) {
+            $safeRow[] = $this->_csv_cell($value);
+        }
+
+        fputcsv($fp, $safeRow);
+    }
+
     // 数字转"30亿6670万7945"混合格式
     private function _to_mixed(int $n): string
     {
@@ -374,6 +399,81 @@ class Home extends \Phpcmf\App
         $this->_cfg_set('base_time',  (string) $cutoffTime);
 
         $this->_json(1, '归档成功，新基数：' . $this->_to_mixed($newBase));
+    }
+
+    public function export_csv()
+    {
+        if (!$this->uid || empty($this->member['is_admin'])) {
+            $this->_json(0, '无权限');
+        }
+
+        $db = \Phpcmf\Service::M()->db;
+
+        $baseCount = (int) $this->_cfg_get('base_count', '0');
+        $baseTime  = (int) $this->_cfg_get('base_time', '0');
+
+        $sumQuery = $db->table($this->table)->selectSum('number');
+        if ($baseTime > 0) {
+            $sumQuery->where('inputtime >', $baseTime);
+        }
+        $sumRow = $sumQuery->get()->getRow();
+        $newSum = $sumRow ? (int) $sumRow->number : 0;
+        $total  = $baseCount + $newSum;
+
+        $totalRows = $db->table($this->table)->countAllResults();
+        $list = $db->table($this->table)
+            ->orderBy('inputtime', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->get()->getResultArray();
+
+        $filename = 'baoshu_export_' . date('Y-m-d') . '.csv';
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $fp = fopen('php://output', 'w');
+        if (!$fp) {
+            exit;
+        }
+
+        fwrite($fp, "\xEF\xBB\xBF");
+
+        $this->_csv_row($fp, ['报数导出报表']);
+        $this->_csv_row($fp, ['导出日期', date('Y-m-d')]);
+        $this->_csv_row($fp, ['导出时间', date('Y-m-d H:i:s')]);
+        $this->_csv_row($fp, ['导出人', $this->member['username'] ?? ('用户' . $this->uid)]);
+        $this->_csv_row($fp, ['放生总数', (string) $total]);
+        $this->_csv_row($fp, ['放生总数显示', $this->_to_mixed($total) . '位']);
+        $this->_csv_row($fp, ['归档基数', (string) $baseCount]);
+        $this->_csv_row($fp, ['归档截止时间', $this->_format_datetime($baseTime)]);
+        $this->_csv_row($fp, ['归档后新增合计', (string) $newSum]);
+        $this->_csv_row($fp, ['明细记录数', (string) $totalRows]);
+        $this->_csv_row($fp, []);
+        $this->_csv_row($fp, ['提交明细']);
+        $this->_csv_row($fp, ['ID', '状态', '提交时间', '用户ID', '用户名', '数量', '数量显示', '内容描述']);
+
+        foreach ($list as $row) {
+            $isArchived = $baseTime > 0 && (int) $row['inputtime'] <= $baseTime;
+            $this->_csv_row($fp, [
+                (string) $row['id'],
+                $isArchived ? '已归档' : '当前',
+                $this->_format_datetime((int) $row['inputtime']),
+                (string) $row['uid'],
+                $row['username'],
+                (string) $row['number'],
+                $this->_to_mixed((int) $row['number']) . '位',
+                $row['note'],
+            ]);
+        }
+
+        fclose($fp);
+        exit;
     }
 
     public function changepassword()

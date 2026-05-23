@@ -54,6 +54,7 @@
       <span>报数记录</span>
       <div style="display:flex;gap:6px;align-items:center">
         {if $is_admin}<button type="button" id="archive-toggle-btn" class="btn-logout btn-archive" onclick="toggleArchiveMode()">开始归档</button>{/if}
+        {if $is_admin}<a href="index.php?s=baoshu&c=home&m=export_csv" class="btn-history">导出数据</a>{/if}
         <a href="index.php?s=baoshu&c=home&m=history" class="btn-history">历史记录</a>
       </div>
     </div>
