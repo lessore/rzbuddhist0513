@@ -50,9 +50,9 @@
 
   <!-- 报数记录 -->
   <div class="card">
-    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+    <div class="section-title record-titlebar" style="display:flex;justify-content:space-between;align-items:center">
       <span>报数记录</span>
-      <div style="display:flex;gap:6px;align-items:center">
+      <div class="record-title-actions" style="display:flex;gap:6px;align-items:center">
         {if $is_admin}<button type="button" id="archive-toggle-btn" class="btn-logout btn-archive" onclick="toggleArchiveMode()">开始归档</button>{/if}
         {if $is_admin}<a href="index.php?s=baoshu&c=home&m=export_csv" class="btn-history">导出数据</a>{/if}
         <a href="index.php?s=baoshu&c=home&m=history" class="btn-history">历史记录</a>
@@ -272,6 +272,30 @@
   </div>
 </div>
 
+<!-- 归档原因弹窗 -->
+<div class="modal fade" id="archiveModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">归档至此</h4>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="archive-record-id">
+        <div class="form-group">
+          <label>归档原因 <span style="color:#e74c3c">*</span></label>
+          <textarea class="form-control" id="archive-reason" rows="4" maxlength="500" placeholder="请填写本次归档原因"></textarea>
+          <div id="archive-reason-count" style="font-size:12px;color:#aaa;text-align:right;margin-top:3px"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-action-btn modal-cancel-btn" data-dismiss="modal">取消</button>
+        <button type="button" class="modal-action-btn modal-primary-btn" id="archive-save-btn">确认归档</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-msg" id="toast"></div>
 
 <style>
@@ -279,7 +303,10 @@
 .record-note{display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .record-note.expanded{display:block;overflow:visible}
 .btn-expand{display:none;background:none;border:none;color:#a20325;font-size:12px;padding:2px 0;cursor:pointer}
-.record-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.record-titlebar{gap:10px;flex-wrap:wrap}
+.record-title-actions{flex-wrap:wrap;justify-content:flex-end}
+.record-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:8px}
+.record-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
 .pagination{display:flex;align-items:center;gap:4px;padding:14px 0 2px;flex-wrap:wrap}
 .pg-btn{min-width:32px;height:32px;line-height:32px;text-align:center;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#490f10;text-decoration:none;display:inline-block;padding:0 6px}
 .pg-btn:hover{border-color:#490f10;background:#fcf2ee}
@@ -292,10 +319,10 @@
 .login-tabs>li.active>a{color:#490f10;border-bottom:2px solid #490f10;font-weight:bold}
 .btn-getcode{background:#fff;color:#490f10;border:1px solid #490f10;border-radius:8px;padding:10px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
 .btn-getcode:disabled{color:#bbb;border-color:#ddd;cursor:not-allowed}
-.btn-edit,.btn-del{border:none;background:none;font-size:13px;cursor:pointer;padding:3px 8px;border-radius:4px}
+.btn-edit,.btn-del,.btn-archive-item{border:none;background:none;font-size:13px;cursor:pointer;padding:3px 8px;border-radius:4px}
 .btn-edit{color:#a20325;background:#fcf2ee}
-.btn-del{color:#e74c3c;background:#fcf2ee;margin-left:6px}
-.btn-archive-item{color:#b8860b;background:#fdf8ee;margin-left:6px}
+.btn-del{color:#e74c3c;background:#fcf2ee}
+.btn-archive-item{color:#b8860b;background:#fdf8ee}
 .btn-edit:hover{background:#e8e0fa}
 .btn-del:hover{background:#fddcd9}
 .btn-logout{background:none;border:1px solid #ccc;color:#999;font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer}
@@ -308,6 +335,17 @@
 .archive-mode-on:hover{background:#e74c3c!important;color:#fff!important}
 .btn-history{font-size:12px;color:#888;border:1px solid #ccc;border-radius:6px;padding:3px 10px;text-decoration:none}
 .btn-history:hover{color:#490f10;border-color:#490f10}
+#archiveModal .modal-dialog{max-width:560px}
+#archiveModal .modal-footer{display:flex;justify-content:flex-end;align-items:center;gap:10px}
+#archiveModal .modal-footer:before,
+#archiveModal .modal-footer:after{display:none}
+#archive-reason{min-height:120px;line-height:1.6}
+.modal-action-btn{display:inline-flex;align-items:center;justify-content:center;min-width:88px;height:38px;padding:0 18px;border-radius:6px;font-size:14px;line-height:1;border:1px solid transparent;cursor:pointer;letter-spacing:0}
+.modal-cancel-btn{background:#fff;color:#555;border-color:#ccc}
+.modal-cancel-btn:hover{border-color:#999;color:#333}
+.modal-primary-btn{min-width:112px;background:#490f10;color:#fff;border-color:#490f10}
+.modal-primary-btn:hover{background:#3b0c0d;border-color:#3b0c0d}
+.modal-primary-btn:disabled{background:#bbb;border-color:#bbb;cursor:not-allowed}
 .total-box{background:#3d0a0b;color:#f5e6c8;padding:30px 2px 24px;border-radius:0;text-align:center}
 .total-main{padding:0 0 14px}
 .total-mixed{font-size:27px;font-weight:bold;letter-spacing:1px;line-height:1.1}
@@ -315,6 +353,19 @@
 .total-month{font-size:10.5px;font-weight:bold;}
 .total-month-label{color:#c9a96e}
 .total-month-num{color:#f5e6c8;margin-left:4px}
+@media(max-width:480px){
+  .record-titlebar{align-items:flex-start!important}
+  .record-title-actions{width:100%;justify-content:flex-start}
+  .record-footer{align-items:flex-start;flex-direction:column}
+  .record-actions{justify-content:flex-start}
+  .btn-history,.btn-logout{display:inline-flex;align-items:center;height:30px;line-height:1}
+  #archiveModal .modal-dialog{margin:10px}
+  #archiveModal .modal-header{padding:14px}
+  #archiveModal .modal-body{padding:14px}
+  #archiveModal .modal-footer{padding:12px 14px;gap:8px}
+  #archiveModal .modal-action-btn{flex:1;min-width:0;height:40px;padding:0 10px}
+  #archive-reason{min-height:132px}
+}
 </style>
 
 <script>
@@ -370,21 +421,60 @@ function toggleArchiveMode() {
 // ── 归档至指定记录 ──────────────────────────────────────────────────
 function doArchiveAt(btn) {
     var id = btn.closest('.record-item').dataset.id;
-    if (!confirm('确定将此条及之前的所有记录归档？\n之后的记录保留，总数不变。')) return;
+    document.getElementById('archive-record-id').value = id;
+    document.getElementById('archive-reason').value = '';
+    document.getElementById('archive-reason-count').textContent = '';
+    document.getElementById('archive-save-btn').disabled = false;
+    $('#archiveModal').modal('show');
+}
+
+var archiveReasonEl = document.getElementById('archive-reason');
+var archiveReasonCount = document.getElementById('archive-reason-count');
+if (archiveReasonEl && archiveReasonCount) {
+    archiveReasonEl.addEventListener('input', function(){
+        archiveReasonCount.textContent = this.value.length > 0 ? this.value.length + ' / 500' : '';
+    });
+}
+
+var archiveSaveBtn = document.getElementById('archive-save-btn');
+if (archiveSaveBtn) {
+    archiveSaveBtn.addEventListener('click', function(){
+        var id = document.getElementById('archive-record-id').value;
+        var reason = document.getElementById('archive-reason').value.trim();
+        if (!reason) { showToast('请填写归档原因'); return; }
+        if (reason.length > 500) { showToast('归档原因不超过500字'); return; }
+        var btn = this;
+        btn.disabled = true;
+        doArchiveSubmit(id, reason, btn);
+    });
+    $('#archiveModal').on('hidden.bs.modal', function(){
+        document.getElementById('archive-record-id').value = '';
+        document.getElementById('archive-reason').value = '';
+        document.getElementById('archive-reason-count').textContent = '';
+        document.getElementById('archive-save-btn').disabled = false;
+    });
+}
+
+function doArchiveSubmit(id, reason, btn) {
     $.ajax({
         url     : 'index.php?s=baoshu&c=home&m=archive',
         method  : 'POST',
-        data    : { record_id: id },
+        data    : { record_id: id, reason: reason },
         dataType: 'json',
         success : function(res) {
             if (res.code == 1) {
+                $('#archiveModal').modal('hide');
                 showToast(res.msg);
                 setTimeout(function(){ location.reload(); }, 1500);
             } else {
                 showToast(res.msg || '操作失败');
+                if (btn) btn.disabled = false;
             }
         },
-        error: function(){ showToast('网络错误'); }
+        error: function(){
+            showToast('网络错误');
+            if (btn) btn.disabled = false;
+        }
     });
 }
 

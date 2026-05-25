@@ -44,11 +44,19 @@ class Home extends \Phpcmf\App
                 `username`  varchar(100)     NOT NULL DEFAULT '',
                 `number`    int(11) UNSIGNED NOT NULL DEFAULT 0,
                 `note`      text             NOT NULL,
+                `archive_id` int(11) UNSIGNED NOT NULL DEFAULT 0,
                 `inputtime` int(11) UNSIGNED NOT NULL DEFAULT 0,
                 PRIMARY KEY (`id`),
                 KEY `uid` (`uid`),
+                KEY `archive_id` (`archive_id`),
                 KEY `inputtime` (`inputtime`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='参与报数'");
+        } else {
+            $field = $db->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'archive_id'")->getRowArray();
+            if (!$field) {
+                $db->query("ALTER TABLE `{$this->table}` ADD `archive_id` int(11) UNSIGNED NOT NULL DEFAULT 0 AFTER `note`");
+                $db->query("ALTER TABLE `{$this->table}` ADD KEY `archive_id` (`archive_id`)");
+            }
         }
         $cfg = $this->table . '_config';
         if (!$db->tableExists($cfg)) {
@@ -57,6 +65,26 @@ class Home extends \Phpcmf\App
                 `v` varchar(255) NOT NULL DEFAULT '',
                 PRIMARY KEY (`k`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+        $archive = $this->table . '_archive';
+        if (!$db->tableExists($archive)) {
+            $db->query("CREATE TABLE IF NOT EXISTS `{$archive}` (
+                `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+                `start_time` int(11) UNSIGNED NOT NULL DEFAULT 0,
+                `cutoff_time` int(11) UNSIGNED NOT NULL DEFAULT 0,
+                `cutoff_record_id` int(11) UNSIGNED NOT NULL DEFAULT 0,
+                `reason` varchar(500) NOT NULL DEFAULT '',
+                `record_count` int(11) UNSIGNED NOT NULL DEFAULT 0,
+                `archive_sum` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
+                `base_before` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
+                `base_after` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
+                `admin_uid` int(11) UNSIGNED NOT NULL DEFAULT 0,
+                `admin_username` varchar(100) NOT NULL DEFAULT '',
+                `inputtime` int(11) UNSIGNED NOT NULL DEFAULT 0,
+                PRIMARY KEY (`id`),
+                KEY `cutoff_time` (`cutoff_time`),
+                KEY `inputtime` (`inputtime`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报数归档批次'");
         }
     }
 
@@ -78,6 +106,11 @@ class Home extends \Phpcmf\App
         } else {
             $db->table($tbl)->insert(['k' => $key, 'v' => $value]);
         }
+    }
+
+    private function _archive_table(): string
+    {
+        return $this->table . '_archive';
     }
 
     private function _format_datetime(int $timestamp): string
@@ -103,6 +136,47 @@ class Home extends \Phpcmf\App
         }
 
         fputcsv($fp, $safeRow);
+    }
+
+    private function _load_archive_map(array $archiveIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $archiveIds))));
+        if (!$ids) {
+            return [];
+        }
+
+        $rows = \Phpcmf\Service::M()->db
+            ->table($this->_archive_table())
+            ->whereIn('id', $ids)
+            ->get()->getResultArray();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row['id']] = $row;
+        }
+
+        return $map;
+    }
+
+    private function _attach_archive_info(array &$list): void
+    {
+        $archiveIds = [];
+        foreach ($list as $row) {
+            if (!empty($row['archive_id'])) {
+                $archiveIds[] = (int) $row['archive_id'];
+            }
+        }
+
+        $archiveMap = $this->_load_archive_map($archiveIds);
+        foreach ($list as &$row) {
+            $archive = !empty($row['archive_id']) && isset($archiveMap[(int) $row['archive_id']])
+                ? $archiveMap[(int) $row['archive_id']]
+                : null;
+            $row['archive_reason'] = $archive ? $archive['reason'] : '';
+            $row['archive_time'] = $archive ? (int) $archive['inputtime'] : 0;
+            $row['archive_username'] = $archive ? $archive['admin_username'] : '';
+        }
+        unset($row);
     }
 
     // 数字转"30亿6670万7945"混合格式
@@ -268,6 +342,7 @@ class Home extends \Phpcmf\App
             $row['number_mixed'] = $this->_to_mixed((int) $row['number']);
         }
         unset($row);
+        $this->_attach_archive_info($list);
 
         // 统计总数 = 基数 + 归档后新记录之和
         $sumQuery = $db->table($this->table)->selectSum('number');
@@ -343,6 +418,7 @@ class Home extends \Phpcmf\App
             $row['number_mixed'] = $this->_to_mixed((int) $row['number']);
         }
         unset($row);
+        $this->_attach_archive_info($list);
 
         \Phpcmf\Service::V()->assign([
             'meta_title'  => '历史记录',
@@ -366,6 +442,14 @@ class Home extends \Phpcmf\App
         $db = \Phpcmf\Service::M()->db;
 
         $recordId = intval(\Phpcmf\Service::L('input')->post('record_id'));
+        $reason   = trim(strip_tags(\Phpcmf\Service::L('input')->post('reason')));
+
+        if ($reason === '') {
+            $this->_json(0, '请填写归档原因');
+        }
+        if (mb_strlen($reason) > 500) {
+            $this->_json(0, '归档原因不超过500字');
+        }
 
         // 确定归档截止时间
         if ($recordId > 0) {
@@ -387,16 +471,63 @@ class Home extends \Phpcmf\App
         }
 
         // 累加 oldTime < inputtime <= cutoffTime 的记录
-        $q = $db->table($this->table)->selectSum('number')
+        $q = $db->table($this->table)->selectSum('number')->selectCount('id', 'record_count')
             ->where('inputtime <=', $cutoffTime);
         if ($oldTime > 0) $q->where('inputtime >', $oldTime);
-        $row    = $q->get()->getRow();
-        $newSum = $row ? (int) $row->number : 0;
+        $row         = $q->get()->getRow();
+        $newSum      = $row ? (int) $row->number : 0;
+        $recordCount = $row ? (int) $row->record_count : 0;
+
+        if ($recordCount <= 0 || $newSum <= 0) {
+            $this->_json(0, '没有可归档记录');
+        }
 
         $newBase = (int) ($oldBase + $newSum);
 
+        $archiveData = [
+            'start_time'       => $oldTime > 0 ? $oldTime + 1 : 0,
+            'cutoff_time'      => $cutoffTime,
+            'cutoff_record_id' => $recordId,
+            'reason'           => $reason,
+            'record_count'     => $recordCount,
+            'archive_sum'      => $newSum,
+            'base_before'      => $oldBase,
+            'base_after'       => $newBase,
+            'admin_uid'        => (int) $this->uid,
+            'admin_username'   => $this->member['username'] ?? ('用户' . $this->uid),
+            'inputtime'        => SYS_TIME,
+        ];
+        $db->table($this->_archive_table())->insert($archiveData);
+        $archiveId = (int) $db->insertID();
+        if (!$archiveId) {
+            $latest = $db->table($this->_archive_table())
+                ->where('admin_uid', (int) $this->uid)
+                ->where('inputtime', SYS_TIME)
+                ->orderBy('id', 'DESC')
+                ->get()->getRowArray();
+            $archiveId = $latest ? (int) $latest['id'] : 0;
+        }
+        if (!$archiveId) {
+            $this->_json(0, '归档批次创建失败');
+        }
+
+        $update = $db->table($this->table)->where('inputtime <=', $cutoffTime);
+        if ($oldTime > 0) $update->where('inputtime >', $oldTime);
+        $update->update(['archive_id' => $archiveId]);
+
         $this->_cfg_set('base_count', (string) $newBase);
         $this->_cfg_set('base_time',  (string) $cutoffTime);
+
+        $this->_write_log(sprintf(
+            "[%s] ARCHIVE uid=%d user=%s archive_id=%d record_count=%d sum=%d reason=%s",
+            date('Y-m-d H:i:s'),
+            $this->uid,
+            $this->member['username'] ?? ('用户' . $this->uid),
+            $archiveId,
+            $recordCount,
+            $newSum,
+            mb_substr($reason, 0, 200)
+        ));
 
         $this->_json(1, '归档成功，新基数：' . $this->_to_mixed($newBase));
     }
@@ -425,6 +556,12 @@ class Home extends \Phpcmf\App
             ->orderBy('inputtime', 'DESC')
             ->orderBy('id', 'DESC')
             ->get()->getResultArray();
+        $this->_attach_archive_info($list);
+
+        $latestArchive = $db->table($this->_archive_table())
+            ->orderBy('inputtime', 'DESC')
+            ->limit(1)
+            ->get()->getRowArray();
 
         $filename = 'baoshu_export_' . date('Y-m-d') . '.csv';
 
@@ -454,9 +591,12 @@ class Home extends \Phpcmf\App
         $this->_csv_row($fp, ['归档截止时间', $this->_format_datetime($baseTime)]);
         $this->_csv_row($fp, ['归档后新增合计', (string) $newSum]);
         $this->_csv_row($fp, ['明细记录数', (string) $totalRows]);
+        $this->_csv_row($fp, ['最新归档时间', $latestArchive ? $this->_format_datetime((int) $latestArchive['inputtime']) : '']);
+        $this->_csv_row($fp, ['最新归档原因', $latestArchive ? $latestArchive['reason'] : '']);
+        $this->_csv_row($fp, ['最新归档人', $latestArchive ? $latestArchive['admin_username'] : '']);
         $this->_csv_row($fp, []);
         $this->_csv_row($fp, ['提交明细']);
-        $this->_csv_row($fp, ['ID', '状态', '提交时间', '用户ID', '用户名', '数量', '数量显示', '内容描述']);
+        $this->_csv_row($fp, ['ID', '状态', '提交时间', '用户ID', '用户名', '数量', '数量显示', '归档时间', '归档原因', '归档人', '内容描述']);
 
         foreach ($list as $row) {
             $isArchived = $baseTime > 0 && (int) $row['inputtime'] <= $baseTime;
@@ -468,6 +608,9 @@ class Home extends \Phpcmf\App
                 $row['username'],
                 (string) $row['number'],
                 $this->_to_mixed((int) $row['number']) . '位',
+                $this->_format_datetime((int) $row['archive_time']),
+                $row['archive_reason'],
+                $row['archive_username'],
                 $row['note'],
             ]);
         }
